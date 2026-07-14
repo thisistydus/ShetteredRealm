@@ -65,6 +65,8 @@ func _ready() -> void:
 	Events.party_defeated.connect(_on_defeat)
 	Events.shake.connect(func(a): _shake_amt = maxf(_shake_amt, a))
 
+	if OS.get_environment("MUTE") != "":
+		AudioServer.set_bus_mute(0, true)  # silent automated test runs
 	Sfx.play_music()
 	_start_encounter(0)
 
