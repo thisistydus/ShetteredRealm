@@ -88,15 +88,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_drag_cell = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var local_press: Vector2 = make_input_local(event).position
 		if event.pressed:
-			var c := _cell_at(get_global_mouse_position())
+			var c := _cell_at_local(local_press)
 			if c.x >= 0 and _is_movable(c):
 				_drag_cell = c
-				_drag_start = get_global_mouse_position()
+				_drag_start = local_press
 		else:
 			_drag_cell = Vector2i(-1, -1)
 	elif event is InputEventMouseMotion and _drag_cell.x >= 0:
-		var delta := get_global_mouse_position() - _drag_start
+		var delta: Vector2 = make_input_local(event).position - _drag_start
 		if delta.length() >= 22.0:
 			var dir := Vector2i.ZERO
 			if absf(delta.x) > absf(delta.y):
@@ -109,8 +110,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _in_bounds(target) and _is_movable(target):
 				_try_swap(from, target)
 
-func _cell_at(world: Vector2) -> Vector2i:
-	var local := world - global_position
+func _cell_at_local(local: Vector2) -> Vector2i:
 	var c := Vector2i(int(floor(local.x / CELL)), int(floor(local.y / CELL)))
 	if _in_bounds(c):
 		return c

@@ -44,6 +44,8 @@ func _ready() -> void:
 	bg.color = Color(0.10, 0.09, 0.14)
 	bg.size = Vector2(1280, 720)
 	bg.z_index = -10
+	# never intercept mouse events meant for the board
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	shaker = Node2D.new()
@@ -71,6 +73,8 @@ func _ready() -> void:
 	var sim_dir := OS.get_environment("SIMTEST")
 	if sim_dir != "":
 		_simtest(sim_dir)
+	if OS.get_environment("INPUTTEST") != "":
+		_inputtest()
 	if OS.get_environment("DEBUGMODS") != "":
 		await get_tree().create_timer(1.0).timeout
 		board.freeze_random(5)
@@ -183,6 +187,47 @@ func _simtest(dir: String) -> void:
 	get_viewport().get_texture().get_image().save_png(dir + "/sim_end.png")
 	print("SIMTEST COMPLETE over=%s encounter=%d party_hp=%d" % [_over, _encounter_i, combat.party_hp])
 	get_tree().quit()
+
+func _inputtest() -> void:
+	# debug: drive a drag-swap through the REAL input pipeline (synthesized
+	# mouse events), so anything that eats mouse input makes this fail.
+	await get_tree().create_timer(2.5).timeout
+	var mv: Array = board.find_move()
+	if mv.is_empty():
+		print("INPUTTEST FAIL - no move available")
+		get_tree().quit()
+		return
+	var matched := [false]
+	Events.match_made.connect(func(_k, _t, _u, _c, _p): matched[0] = true)
+	var a_pos: Vector2 = board.global_position + board.cell_center(mv[0])
+	var b_pos: Vector2 = board.global_position + board.cell_center(mv[1])
+	_send_motion(a_pos, Vector2.ZERO)
+	await get_tree().create_timer(0.05).timeout
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = a_pos
+	Input.parse_input_event(press)
+	await get_tree().create_timer(0.05).timeout
+	_send_motion(b_pos, b_pos - a_pos)
+	await get_tree().create_timer(0.05).timeout
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = b_pos
+	Input.parse_input_event(release)
+	await get_tree().create_timer(1.5).timeout
+	if matched[0]:
+		print("INPUTTEST PASS - mouse drag produced a swap + match")
+	else:
+		print("INPUTTEST FAIL - drag did not reach the board")
+	get_tree().quit()
+
+func _send_motion(pos: Vector2, rel: Vector2) -> void:
+	var m := InputEventMouseMotion.new()
+	m.position = pos
+	m.relative = rel
+	Input.parse_input_event(m)
 
 func _autoshot(dir: String) -> void:
 	# debug helper: save screenshots then quit (used for automated visual checks)
