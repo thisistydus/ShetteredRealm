@@ -65,6 +65,7 @@ func _ready() -> void:
 	Events.party_defeated.connect(_on_defeat)
 	Events.shake.connect(func(a): _shake_amt = maxf(_shake_amt, a))
 
+	Sfx.play_music()
 	_start_encounter(0)
 
 	var shot_dir := OS.get_environment("AUTOSHOT")
@@ -122,11 +123,13 @@ func _on_enemy_died() -> void:
 		_start_encounter(_encounter_i + 1)
 	else:
 		_over = true
+		Sfx.fade_out_music()
 		hud.show_end("YOU WIN!", Color(1, 0.9, 0.4))
 
 func _on_defeat() -> void:
 	_over = true
 	board.input_enabled = false
+	Sfx.fade_out_music()
 	Sfx.play("defeat")
 	hud.show_end("DEFEAT", Color(1, 0.35, 0.3))
 
