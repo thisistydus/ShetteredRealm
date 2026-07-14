@@ -13,8 +13,11 @@ var grid: Array = []            # grid[x][y] -> Tile or null
 var input_enabled := false      # set by combat flow
 var resolving := false
 
-var _drag_cell := Vector2i(-1, -1)
+const NO_CELL := Vector2i(-1, -1)
+
+var _drag_cell := NO_CELL
 var _drag_start := Vector2.ZERO
+var _selected := NO_CELL   # click-click swap: currently selected tile
 var _anim_frame := 0
 var _rng := RandomNumberGenerator.new()
 
@@ -85,7 +88,7 @@ func _would_start_match(x: int, y: int, kind: int) -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled or resolving:
-		_drag_cell = Vector2i(-1, -1)
+		_drag_cell = NO_CELL
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var local_press: Vector2 = make_input_local(event).position
@@ -95,7 +98,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_drag_cell = c
 				_drag_start = local_press
 		else:
-			_drag_cell = Vector2i(-1, -1)
+			# released without dragging -> treat as a click (select / swap)
+			if _drag_cell != NO_CELL:
+				_handle_click(_drag_cell)
+			_drag_cell = NO_CELL
 	elif event is InputEventMouseMotion and _drag_cell.x >= 0:
 		var delta: Vector2 = make_input_local(event).position - _drag_start
 		if delta.length() >= 22.0:
@@ -106,9 +112,33 @@ func _unhandled_input(event: InputEvent) -> void:
 				dir = Vector2i(0, signi(int(delta.y)))
 			var target := _drag_cell + dir
 			var from := _drag_cell
-			_drag_cell = Vector2i(-1, -1)
+			_drag_cell = NO_CELL
 			if _in_bounds(target) and _is_movable(target):
+				_set_selected(NO_CELL)  # drag always wins over a pending selection
 				_try_swap(from, target)
+
+func _handle_click(c: Vector2i) -> void:
+	# click-click swapping, an alternative to dragging:
+	# first click selects, second click on an adjacent tile swaps.
+	if _selected == NO_CELL:
+		_set_selected(c)
+	elif _selected == c:
+		_set_selected(NO_CELL)
+	elif absi(_selected.x - c.x) + absi(_selected.y - c.y) == 1 and _is_movable(_selected):
+		var from := _selected
+		_set_selected(NO_CELL)
+		_try_swap(from, c)
+	else:
+		_set_selected(c)  # too far away: move the selection instead
+
+func _set_selected(c: Vector2i) -> void:
+	if _selected != NO_CELL:
+		var old = grid[_selected.x][_selected.y]
+		if old != null and not old.dying:
+			old.selected = false
+	_selected = c
+	if c != NO_CELL:
+		grid[c.x][c.y].selected = true
 
 func _cell_at_local(local: Vector2) -> Vector2i:
 	var c := Vector2i(int(floor(local.x / CELL)), int(floor(local.y / CELL)))
@@ -215,6 +245,7 @@ func _resolve(start_with_collapse := false) -> void:
 	if resolving:
 		return
 	resolving = true
+	_set_selected(NO_CELL)  # selection can't survive tiles popping
 	var combo := 0
 	if start_with_collapse:
 		_collapse_and_refill()

@@ -200,31 +200,50 @@ func _inputtest() -> void:
 		print("INPUTTEST FAIL - no move available")
 		get_tree().quit()
 		return
-	var matched := [false]
-	Events.match_made.connect(func(_k, _t, _u, _c, _p): matched[0] = true)
+	var matches := [0]
+	Events.match_made.connect(func(_k, _t, _u, _c, _p): matches[0] += 1)
+	# --- test 1: drag swap ---
 	var a_pos: Vector2 = board.global_position + board.cell_center(mv[0])
 	var b_pos: Vector2 = board.global_position + board.cell_center(mv[1])
 	_send_motion(a_pos, Vector2.ZERO)
 	await get_tree().create_timer(0.05).timeout
-	var press := InputEventMouseButton.new()
-	press.button_index = MOUSE_BUTTON_LEFT
-	press.pressed = true
-	press.position = a_pos
-	Input.parse_input_event(press)
+	_send_button(a_pos, true)
 	await get_tree().create_timer(0.05).timeout
 	_send_motion(b_pos, b_pos - a_pos)
 	await get_tree().create_timer(0.05).timeout
-	var release := InputEventMouseButton.new()
-	release.button_index = MOUSE_BUTTON_LEFT
-	release.pressed = false
-	release.position = b_pos
-	Input.parse_input_event(release)
+	_send_button(b_pos, false)
 	await get_tree().create_timer(1.5).timeout
-	if matched[0]:
-		print("INPUTTEST PASS - mouse drag produced a swap + match")
-	else:
-		print("INPUTTEST FAIL - drag did not reach the board")
+	var drag_ok: bool = matches[0] > 0
+	print("INPUTTEST drag: %s" % ("PASS" if drag_ok else "FAIL"))
+	# --- test 2: click-click swap ---
+	while board.resolving:
+		await get_tree().create_timer(0.2).timeout
+	var before: int = matches[0]
+	mv = board.find_move()
+	if mv.is_empty():
+		print("INPUTTEST click: SKIP - no move available")
+		get_tree().quit()
+		return
+	for cell in mv:
+		var pos: Vector2 = board.global_position + board.cell_center(cell)
+		_send_motion(pos, Vector2.ZERO)
+		await get_tree().create_timer(0.05).timeout
+		_send_button(pos, true)
+		await get_tree().create_timer(0.05).timeout
+		_send_button(pos, false)
+		await get_tree().create_timer(0.2).timeout
+	await get_tree().create_timer(1.5).timeout
+	var click_ok: bool = matches[0] > before
+	print("INPUTTEST click: %s" % ("PASS" if click_ok else "FAIL"))
+	print("INPUTTEST %s" % ("PASS" if drag_ok and click_ok else "FAIL"))
 	get_tree().quit()
+
+func _send_button(pos: Vector2, pressed: bool) -> void:
+	var b := InputEventMouseButton.new()
+	b.button_index = MOUSE_BUTTON_LEFT
+	b.pressed = pressed
+	b.position = pos
+	Input.parse_input_event(b)
 
 func _send_motion(pos: Vector2, rel: Vector2) -> void:
 	var m := InputEventMouseMotion.new()

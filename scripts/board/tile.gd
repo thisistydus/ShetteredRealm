@@ -33,6 +33,10 @@ var locked := false:
 	set(v):
 		locked = v
 		_refresh()
+var selected := false:
+	set(v):
+		selected = v
+		_refresh()
 var grid_pos := Vector2i.ZERO
 var dying := false
 
@@ -89,6 +93,10 @@ func _draw() -> void:
 
 func _draw_overlay() -> void:
 	var r := Rect2(-SIZE / 2, -SIZE / 2, SIZE, SIZE)
+	if selected:
+		# click-click selection ring
+		_overlay.draw_rect(r.grow(2), Color(1, 1, 1, 0.95), false, 4.0)
+		_overlay.draw_rect(r.grow(6), Color(1, 1, 0.5, 0.5), false, 3.0)
 	if frozen:
 		# icy overlay
 		_overlay.draw_rect(r.grow(-2), Color(0.75, 0.9, 1.0, 0.45))
