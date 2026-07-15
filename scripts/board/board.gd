@@ -23,6 +23,18 @@ var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	_rng.randomize()
+	# ornate frame cropped from the background reference art
+	var frame := NinePatchRect.new()
+	frame.texture = preload("res://art/board_frame.png")
+	frame.patch_margin_left = 40
+	frame.patch_margin_top = 40
+	frame.patch_margin_right = 40
+	frame.patch_margin_bottom = 40
+	frame.draw_center = false
+	frame.position = Vector2(-30, -30)
+	frame.size = Vector2(SIZE * CELL + 60, SIZE * CELL + 60)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(frame)
 	for x in SIZE:
 		grid.append([])
 		for y in SIZE:
@@ -45,11 +57,10 @@ func _tick_frames() -> void:
 func _draw() -> void:
 	# board backdrop
 	var pad := 12.0
+	# interior slab only; the NinePatchRect frame supplies the border
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.08, 0.07, 0.12, 0.9)
-	sb.set_corner_radius_all(14)
-	sb.border_color = Color(0.35, 0.3, 0.5)
-	sb.set_border_width_all(3)
+	sb.bg_color = Color(0.115, 0.105, 0.15, 0.95)
+	sb.set_corner_radius_all(8)
 	draw_style_box(sb, Rect2(-pad, -pad, SIZE * CELL + pad * 2, SIZE * CELL + pad * 2))
 	for x in SIZE:
 		for y in SIZE:

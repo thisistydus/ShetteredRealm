@@ -68,14 +68,22 @@ var _current_is_boss := false
 var _over := false
 
 func _ready() -> void:
-	# background
-	var bg := ColorRect.new()
-	bg.color = Color(0.10, 0.09, 0.14)
+	# background art + slight dim so gameplay reads on top
+	var bg := TextureRect.new()
+	bg.texture = preload("res://art/BGart.png")
 	bg.size = Vector2(1280, 720)
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.z_index = -10
 	# never intercept mouse events meant for the board
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.22)
+	dim.size = Vector2(1280, 720)
+	dim.z_index = -9
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(dim)
 
 	shaker = Node2D.new()
 	add_child(shaker)
