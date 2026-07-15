@@ -14,11 +14,14 @@ var input_enabled := false      # set by combat flow
 var resolving := false
 
 const NO_CELL := Vector2i(-1, -1)
+const HINT_DELAY := 4.0    # seconds of inactivity before a hint appears
 
 var _drag_cell := NO_CELL
 var _drag_start := Vector2.ZERO
 var _selected := NO_CELL   # click-click swap: currently selected tile
 var _anim_frame := 0
+var _idle_time := 0.0
+var _hint_cells: Array = []   # tiles currently glowing as a hint
 var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
@@ -53,6 +56,46 @@ func _tick_frames() -> void:
 		for y in SIZE:
 			if grid[x][y] != null:
 				grid[x][y].set_frame(_anim_frame)
+
+# ---------------- idle hint ----------------
+
+func _process(delta: float) -> void:
+	if not input_enabled or resolving:
+		# not the player's turn to move: no idle, no hint
+		if not _hint_cells.is_empty():
+			_clear_hint()
+		_idle_time = 0.0
+		return
+	if not _hint_cells.is_empty():
+		return  # a hint is already showing; leave it until the player acts
+	_idle_time += delta
+	if _idle_time >= HINT_DELAY:
+		_show_hint()
+
+func _show_hint() -> void:
+	# highlight one legal (not necessarily optimal) swap
+	var mv := find_move()
+	if mv.size() == 2:
+		_hint_cells = mv
+		for c in mv:
+			var t = grid[c.x][c.y]
+			if t != null:
+				t.hint()
+	else:
+		_idle_time = 0.0  # no move found (rare); wait and retry instead of scanning every frame
+
+func _clear_hint() -> void:
+	for c in _hint_cells:
+		var t = grid[c.x][c.y]
+		if t != null and is_instance_valid(t):
+			t.clear_hint()
+	_hint_cells.clear()
+
+func _reset_idle() -> void:
+	# player did something deliberate: drop any hint and restart the idle clock
+	_idle_time = 0.0
+	if not _hint_cells.is_empty():
+		_clear_hint()
 
 func _draw() -> void:
 	# board backdrop
@@ -102,6 +145,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_drag_cell = NO_CELL
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_reset_idle()  # any deliberate click counts as activity
 		var local_press: Vector2 = make_input_local(event).position
 		if event.pressed:
 			var c := _cell_at_local(local_press)
@@ -167,6 +211,7 @@ func _is_movable(c: Vector2i) -> bool:
 # ---------------- swapping ----------------
 
 func _try_swap(a: Vector2i, b: Vector2i) -> void:
+	_reset_idle()
 	resolving = true
 	var ta = grid[a.x][a.y]
 	var tb = grid[b.x][b.y]

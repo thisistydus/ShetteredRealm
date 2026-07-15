@@ -118,11 +118,18 @@ func _ready() -> void:
 		_simtest(sim_dir)
 	if OS.get_environment("INPUTTEST") != "":
 		_inputtest()
+	if OS.get_environment("HINTTEST") != "":
+		_hinttest()
 	if OS.get_environment("DEBUGMODS") != "":
 		await get_tree().create_timer(1.0).timeout
 		board.freeze_random(5)
 		board.lock_random(5)
 		board.stone_random(5)
+	if OS.get_environment("HINTSHOT") != "":
+		# let the board sit idle so a hint appears, then screenshot at its peak glow
+		await get_tree().create_timer(4.9).timeout
+		get_viewport().get_texture().get_image().save_png(OS.get_environment("HINTSHOT") + "/hint.png")
+		get_tree().quit()
 
 func _next_encounter() -> void:
 	if _wave.is_empty():
@@ -308,6 +315,25 @@ func _inputtest() -> void:
 	var click_ok: bool = matches[0] > before
 	print("INPUTTEST click: %s" % ("PASS" if click_ok else "FAIL"))
 	print("INPUTTEST %s" % ("PASS" if drag_ok and click_ok else "FAIL"))
+	get_tree().quit()
+
+func _hinttest() -> void:
+	# debug: verify a hint appears only after the idle delay and clears on input.
+	while not board.input_enabled or board.resolving:
+		await get_tree().create_timer(0.2).timeout
+	await get_tree().create_timer(2.0).timeout  # before the 4s delay
+	var early_clear: bool = board._hint_cells.is_empty()
+	await get_tree().create_timer(2.6).timeout  # now past 4s of no input
+	var appeared: bool = board._hint_cells.size() == 2
+	# a deliberate click should drop the hint
+	var pos: Vector2 = board.global_position + board.cell_center(Vector2i(0, 0))
+	_send_button(pos, true)
+	_send_button(pos, false)
+	await get_tree().create_timer(0.2).timeout
+	var cleared: bool = board._hint_cells.is_empty()
+	print("HINTTEST early_clear=%s appeared=%s cleared_on_input=%s -> %s" % [
+		early_clear, appeared, cleared,
+		"PASS" if early_clear and appeared and cleared else "FAIL"])
 	get_tree().quit()
 
 func _send_button(pos: Vector2, pressed: bool) -> void:

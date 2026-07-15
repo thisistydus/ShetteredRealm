@@ -49,6 +49,7 @@ var dying := false
 var _sprite: Sprite2D
 var _atlas: AtlasTexture
 var _overlay: Node2D
+var _hint_tween: Tween
 
 func _ready() -> void:
 	_atlas = AtlasTexture.new()
@@ -146,3 +147,21 @@ func unlock_flash() -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "modulate", Color(1.6, 1.6, 1.6), 0.08)
 	tw.tween_property(self, "modulate", Color.WHITE, 0.15)
+
+func hint() -> void:
+	# subtle looping glow to nudge an idle player toward a valid move
+	if _hint_tween != null and _hint_tween.is_valid():
+		return
+	_hint_tween = create_tween().set_loops()
+	_hint_tween.tween_property(_sprite, "modulate", Color(1.4, 1.35, 1.05), 0.55) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_hint_tween.tween_property(_sprite, "modulate", Color.WHITE, 0.55) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func clear_hint() -> void:
+	if _hint_tween != null and _hint_tween.is_valid():
+		_hint_tween.kill()
+	_hint_tween = null
+	# restore whatever the tile's normal tint should be
+	if not dying:
+		_refresh()
