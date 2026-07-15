@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://byols512upji6"
+path="res://.godot/imported/Byteblade Clash-2.mp3-d5ef57f2594407cb1a2c8d8e300bf5df.mp3str"
+
+[deps]
+
+source_file="res://audio/music/Byteblade Clash-2.mp3"
+dest_files=["res://.godot/imported/Byteblade Clash-2.mp3-d5ef57f2594407cb1a2c8d8e300bf5df.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

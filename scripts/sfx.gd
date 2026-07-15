@@ -4,7 +4,7 @@ extends Node
 var _streams := {}
 
 func _ready() -> void:
-	for n in ["pop", "big", "ability", "heal", "hurt", "ready", "freeze", "lock", "interrupt", "victory", "defeat"]:
+	for n in ["pop", "big", "ability", "heal", "hurt", "ready", "freeze", "lock", "stone", "interrupt", "victory", "defeat"]:
 		var path := "res://audio/%s.wav" % n
 		if ResourceLoader.exists(path):
 			_streams[n] = load(path)

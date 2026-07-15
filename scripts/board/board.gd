@@ -151,7 +151,7 @@ func _in_bounds(c: Vector2i) -> bool:
 
 func _is_movable(c: Vector2i) -> bool:
 	var t = grid[c.x][c.y]
-	return t != null and not t.frozen and not t.locked and not t.dying
+	return t != null and not t.frozen and not t.locked and not t.stoned and not t.dying
 
 # ---------------- swapping ----------------
 
@@ -326,12 +326,20 @@ func lock_random(n: int) -> void:
 		candidates[i].locked = true
 	Sfx.play("lock")
 
+func stone_random(n: int) -> void:
+	# Medusa: petrified tiles can't move but clear normally when matched
+	var candidates := _plain_tiles()
+	candidates.shuffle()
+	for i in mini(n, candidates.size()):
+		candidates[i].stoned = true
+	Sfx.play("stone")
+
 func _plain_tiles() -> Array:
 	var out: Array = []
 	for x in SIZE:
 		for y in SIZE:
 			var t = grid[x][y]
-			if t != null and not t.frozen and not t.locked and not t.dying:
+			if t != null and not t.frozen and not t.locked and not t.stoned and not t.dying:
 				out.append(t)
 	return out
 
@@ -343,6 +351,7 @@ func clear_modifiers() -> void:
 			if t != null:
 				t.frozen = false
 				t.locked = false
+				t.stoned = false
 
 func count_frozen() -> int:
 	var n := 0

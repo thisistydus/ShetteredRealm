@@ -1,8 +1,10 @@
 class_name Tile
 extends Node2D
 ## One gem on the battlefield. Each kind maps to a party member.
-## Modifier states: frozen (can't move or match), locked (can't move,
-## matches but gives no ATB; first match removes the lock instead of clearing).
+## Modifier states:
+##  frozen - can't move or match (Mage's Fireball melts them)
+##  locked - can't move; matches give no ATB, first match removes the lock
+##  stoned - can't move; matching works normally and clears the tile
 
 const SIZE := 60.0
 
@@ -32,6 +34,10 @@ var frozen := false:
 var locked := false:
 	set(v):
 		locked = v
+		_refresh()
+var stoned := false:
+	set(v):
+		stoned = v
 		_refresh()
 var selected := false:
 	set(v):
@@ -73,7 +79,12 @@ func _refresh() -> void:
 	if _atlas == null:
 		return
 	set_frame(0)
-	_sprite.modulate = Color(0.75, 0.9, 1.4, 0.8) if frozen else Color.WHITE
+	if frozen:
+		_sprite.modulate = Color(0.75, 0.9, 1.4, 0.8)
+	elif stoned:
+		_sprite.modulate = Color(0.55, 0.55, 0.58)
+	else:
+		_sprite.modulate = Color.WHITE
 	queue_redraw()
 	_overlay.queue_redraw()
 
@@ -111,6 +122,16 @@ func _draw_overlay() -> void:
 		_overlay.draw_rect(r.grow(-1), g, false, 5.0)
 		_overlay.draw_rect(Rect2(-8, -8, 16, 14), Color(0.35, 0.35, 0.4))
 		_overlay.draw_arc(Vector2(0, -8), 5, PI, TAU, 10, Color(0.35, 0.35, 0.4), 3.0)
+	elif stoned:
+		# stone slab: gray wash + cracks (tile still matches normally)
+		_overlay.draw_rect(r.grow(-2), Color(0.5, 0.5, 0.52, 0.5))
+		_overlay.draw_rect(r.grow(-1), Color(0.42, 0.42, 0.45), false, 5.0)
+		_overlay.draw_polyline(PackedVector2Array([
+			Vector2(-22, -26), Vector2(-12, -12), Vector2(-18, 2), Vector2(-8, 16)
+		]), Color(0.3, 0.3, 0.33, 0.9), 2.0)
+		_overlay.draw_polyline(PackedVector2Array([
+			Vector2(24, -14), Vector2(12, -4), Vector2(16, 10)
+		]), Color(0.3, 0.3, 0.33, 0.9), 2.0)
 
 func pop() -> void:
 	# clear animation, then free

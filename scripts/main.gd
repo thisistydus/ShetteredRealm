@@ -2,7 +2,9 @@ extends Node2D
 ## Prototype orchestrator: builds the scene, runs the 3-encounter flow,
 ## routes enemy attacks to party damage / board modifiers.
 
-const ENCOUNTERS := [
+# Endless mode roster. Waves = 2-3 low-tier enemies, then a mini boss.
+# After each boss falls the loop counter rises and everything scales up.
+const LOW_TIER := [
 	{
 		"name": "Goblin Scout", "hp": 55, "chip_resist": 0.0,
 		"cell": Vector2i(1, 14), "scale": 7.0,
@@ -11,22 +13,44 @@ const ENCOUNTERS := [
 		],
 	},
 	{
+		"name": "Goblin", "hp": 65, "chip_resist": 0.0,
+		"cell": Vector2i(0, 14), "scale": 7.0,
+		"attacks": [
+			{"name": "Stab", "time": 3.5, "kind": "damage", "power": 7},
+		],
+	},
+	{
 		"name": "Frost Mage", "hp": 100, "chip_resist": 0.0,
-		"cell": Vector2i(8, 16), "scale": 7.0,
+		"cell": Vector2i(16, 16), "scale": 7.0,
 		"attacks": [
 			{"name": "Ice Bolt", "time": 4.5, "kind": "damage", "power": 9},
 			{"name": "Freeze", "time": 6.0, "kind": "freeze", "power": 4},
 		],
 	},
+]
+const BOSSES := [
 	{
 		"name": "Crypt Warden", "hp": 150, "chip_resist": 0.88,
-		"cell": Vector2i(13, 14), "scale": 8.0,
+		"cell": Vector2i(13, 14), "scale": 8.0, "boss": true,
 		"attacks": [
 			{"name": "Seal Tiles", "time": 4.0, "kind": "lock", "power": 4},
 			{"name": "Crushing Blow", "time": 8.0, "kind": "damage", "power": 16},
 		],
 	},
+	{
+		"name": "Medusa", "hp": 140, "chip_resist": 0.35,
+		"cell": Vector2i(17, 16), "scale": 8.0, "boss": true,
+		"attacks": [
+			{"name": "Petrify", "time": 5.0, "kind": "stone", "power": 5},
+			{"name": "Stone Gaze", "time": 6.5, "kind": "damage", "power": 14},
+		],
+	},
 ]
+
+# per-loop scaling
+const HP_SCALE := 1.08
+const DMG_SCALE := 1.05
+const SPEED_SCALE := 1.02
 
 var shaker: Node2D
 var board: Board
@@ -35,7 +59,12 @@ var hud: Hud
 var enemy: Enemy = null
 
 var _shake_amt := 0.0
-var _encounter_i := 0
+var _loop := 0            # completed boss cycles (drives scaling)
+var _encounter_num := 0   # total encounters started this run
+var _cleared := 0         # enemies defeated this run
+var _wave: Array = []     # upcoming encounters (base data refs)
+var _boss_i := 0          # alternates Warden / Medusa
+var _current_is_boss := false
 var _over := false
 
 func _ready() -> void:
@@ -67,8 +96,11 @@ func _ready() -> void:
 
 	if OS.get_environment("MUTE") != "":
 		AudioServer.set_bus_mute(0, true)  # silent automated test runs
+	if OS.get_environment("BOSSTEST") != "":
+		# debug: jump straight to a boss (0 = Warden, 1 = Medusa)
+		_wave = [BOSSES[int(OS.get_environment("BOSSTEST")) % BOSSES.size()]]
 	Sfx.play_music()
-	_start_encounter(0)
+	_next_encounter()
 
 	var shot_dir := OS.get_environment("AUTOSHOT")
 	if shot_dir != "":
@@ -82,19 +114,43 @@ func _ready() -> void:
 		await get_tree().create_timer(1.0).timeout
 		board.freeze_random(5)
 		board.lock_random(5)
+		board.stone_random(5)
 
-func _start_encounter(i: int) -> void:
-	_encounter_i = i
-	var d: Dictionary = ENCOUNTERS[i]
+func _next_encounter() -> void:
+	if _wave.is_empty():
+		_build_wave()
+	_start_encounter(_scaled(_wave.pop_front()))
+
+func _build_wave() -> void:
+	var lows := LOW_TIER.duplicate()
+	lows.shuffle()
+	for i in randi_range(2, 3):
+		_wave.append(lows[i % lows.size()])
+	_wave.append(BOSSES[_boss_i % BOSSES.size()])
+	_boss_i += 1
+
+func _scaled(base: Dictionary) -> Dictionary:
+	# apply endless-mode loop scaling to a copy of the base enemy data
+	var d := base.duplicate(true)
+	d.hp = int(round(d.hp * pow(HP_SCALE, _loop)))
+	for a in d.attacks:
+		if a.kind == "damage":
+			a.power = int(round(a.power * pow(DMG_SCALE, _loop)))
+		a.time = a.time / pow(SPEED_SCALE, _loop)
+	return d
+
+func _start_encounter(d: Dictionary) -> void:
+	_encounter_num += 1
+	_current_is_boss = d.get("boss", false)
 	board.clear_modifiers()
 	enemy = Enemy.new()
 	enemy.position = Vector2(330, 240)
 	shaker.add_child(enemy)
 	enemy.setup(d)
 	combat.reset_for_encounter(enemy)
-	Events.encounter_started.emit(i, enemy)
-	var title: String = d.name + (" — Mini Boss" if i == 2 else "")
-	Events.banner.emit(title, Color(1, 0.92, 0.7))
+	Events.encounter_started.emit("Loop %d · Encounter %d" % [_loop + 1, _encounter_num], enemy)
+	var title: String = d.name + (" — Mini Boss" if _current_is_boss else "")
+	Events.banner.emit(title, Color(1, 0.6, 0.55) if _current_is_boss else Color(1, 0.92, 0.7))
 	await get_tree().create_timer(1.5).timeout
 	if _over:
 		return
@@ -112,28 +168,32 @@ func _on_enemy_attack(a: Dictionary) -> void:
 			board.freeze_random(a.power)
 		"lock":
 			board.lock_random(a.power)
+		"stone":
+			board.stone_random(a.power)
 
 func _on_enemy_died() -> void:
 	combat.active = false
 	board.input_enabled = false
-	Sfx.play("victory")
-	Events.banner.emit("VICTORY!", Color(1, 1, 0.5))
+	_cleared += 1
+	if _current_is_boss:
+		_loop += 1
+		Sfx.play("victory")
+		Events.banner.emit("BOSS DOWN! Loop %d begins..." % (_loop + 1), Color(1, 0.8, 0.3))
+	else:
+		Sfx.play("victory")
+		Events.banner.emit("VICTORY!", Color(1, 1, 0.5))
 	await get_tree().create_timer(1.9).timeout
 	if _over:
 		return
-	if _encounter_i < ENCOUNTERS.size() - 1:
-		_start_encounter(_encounter_i + 1)
-	else:
-		_over = true
-		Sfx.fade_out_music()
-		hud.show_end("YOU WIN!", Color(1, 0.9, 0.4))
+	_next_encounter()
 
 func _on_defeat() -> void:
 	_over = true
 	board.input_enabled = false
 	Sfx.fade_out_music()
 	Sfx.play("defeat")
-	hud.show_end("DEFEAT", Color(1, 0.35, 0.3))
+	hud.show_end("DEFEAT", Color(1, 0.35, 0.3),
+		"Reached Loop %d  ·  %d enemies defeated" % [_loop + 1, _cleared])
 
 func _process(delta: float) -> void:
 	# screen shake, applied to the world (HUD stays still)
@@ -155,6 +215,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				board.freeze_random(4)
 			KEY_L: # debug: test lock
 				board.lock_random(4)
+			KEY_S: # debug: test stone
+				board.stone_random(4)
 
 func _simtest(dir: String) -> void:
 	# debug autoplayer: random valid swaps + abilities, screenshots, then quit.
@@ -167,8 +229,8 @@ func _simtest(dir: String) -> void:
 	while not _over:
 		await get_tree().create_timer(0.4).timeout
 		var elapsed := (Time.get_ticks_msec() - start) / 1000.0
-		if _encounter_i != last_enc:
-			last_enc = _encounter_i
+		if _encounter_num != last_enc:
+			last_enc = _encounter_num
 			enc_start = Time.get_ticks_msec()
 		for s in shots:
 			if not shots[s] and elapsed >= s:
@@ -190,7 +252,7 @@ func _simtest(dir: String) -> void:
 			break
 	await get_tree().create_timer(1.0).timeout
 	get_viewport().get_texture().get_image().save_png(dir + "/sim_end.png")
-	print("SIMTEST COMPLETE over=%s encounter=%d party_hp=%d" % [_over, _encounter_i, combat.party_hp])
+	print("SIMTEST COMPLETE over=%s loop=%d cleared=%d party_hp=%d" % [_over, _loop, _cleared, combat.party_hp])
 	get_tree().quit()
 
 func _inputtest() -> void:

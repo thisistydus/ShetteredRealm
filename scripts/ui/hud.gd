@@ -22,6 +22,7 @@ var _panels: Array = []      # per char: {panel, atb_bar, ready_label, base_colo
 var _banner_label: Label
 var _end_screen: Control
 var _end_title: Label
+var _end_subtitle: Label
 var _time := 0.0
 
 const PANEL_POS := Vector2(30, 500)
@@ -191,6 +192,13 @@ func _build_overlays() -> void:
 	_end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_title.add_theme_font_size_override("font_size", 64)
 	_end_screen.add_child(_end_title)
+	_end_subtitle = Label.new()
+	_end_subtitle.position = Vector2(0, 350)
+	_end_subtitle.size = Vector2(1280, 40)
+	_end_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_end_subtitle.add_theme_font_size_override("font_size", 24)
+	_end_subtitle.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+	_end_screen.add_child(_end_subtitle)
 	var btn := Button.new()
 	btn.text = "  Restart  "
 	btn.position = Vector2(560, 400)
@@ -200,9 +208,9 @@ func _build_overlays() -> void:
 
 # ---------------- events ----------------
 
-func _on_encounter_started(index: int, e: Node) -> void:
+func _on_encounter_started(label: String, e: Node) -> void:
 	enemy = e
-	_encounter_label.text = "Encounter %d / 3" % (index + 1)
+	_encounter_label.text = label
 	_enemy_name.text = e.data.name
 
 func _spawn_float(text: String, world_pos: Vector2, color: Color, size: int) -> void:
@@ -228,9 +236,10 @@ func _show_banner(text: String, color: Color) -> void:
 	tw.chain().tween_property(_banner_label, "modulate:a", 0.0, 0.3)
 	tw.chain().tween_callback(func(): _banner_label.visible = false)
 
-func show_end(title: String, color: Color) -> void:
+func show_end(title: String, color: Color, subtitle := "") -> void:
 	_end_title.text = title
 	_end_title.add_theme_color_override("font_color", color)
+	_end_subtitle.text = subtitle
 	_end_screen.visible = true
 
 # ---------------- per-frame polling ----------------
@@ -277,4 +286,5 @@ func _target_line(a: Dictionary) -> String:
 		"damage": return "→ targets the party  (%d dmg)" % a.power
 		"freeze": return "→ targets the board  (freezes %d tiles)" % a.power
 		"lock": return "→ targets the board  (locks %d tiles)" % a.power
+		"stone": return "→ targets the board  (petrifies %d tiles)" % a.power
 	return ""

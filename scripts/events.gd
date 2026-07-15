@@ -17,7 +17,7 @@ signal atb_full(id: int)
 signal ability_used(id: int)
 
 # Flow / juice
-signal encounter_started(index: int, enemy: Node)
+signal encounter_started(label: String, enemy: Node)
 signal float_text(text: String, world_pos: Vector2, color: Color, size: int)
 signal shake(amount: float)
 signal banner(text: String, color: Color)
